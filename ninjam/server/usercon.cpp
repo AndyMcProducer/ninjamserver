@@ -97,7 +97,7 @@ extern void logText(char *s, ...);
 #define TRANSFER_TIMEOUT 8
 
 User_Connection::User_Connection(JNL_Connection *con, User_Group *grp) : m_auth_state(0), m_clientcaps(0), m_auth_privs(0), m_reserved(0), m_max_channels(0),
-      m_vote_bpm(0), m_vote_bpm_lasttime(0), m_vote_bpi(0), m_vote_bpi_lasttime(0)
+      m_vote_bpm(0), m_vote_bpm_lasttime(0), m_vote_bpi(0), m_vote_bpi_lasttime(0), m_vote_kick(0), m_vote_kick_lasttime(0)
 {
   m_netcon.attach(con);
 
@@ -977,7 +977,7 @@ void User_Group::AddConnection(JNL_Connection *con, int isres)
   if (isres) p->m_reserved=1;
   m_users.Add(p);
 }
-
+// Voting System Edits, adding !vote kick user@0.0.0.x
 void User_Group::onChatMessage(User_Connection *con, mpb_chat_message *msg)
 {
   if (!strcmp(msg->parms[0],"MSG")) // chat message
@@ -1001,22 +1001,32 @@ void User_Group::onChatMessage(User_Connection *con, mpb_chat_message *msg)
       while (*p && *p != ' ') p++;
       while (*p == ' ') p++;
 
+// Check for Bpm and Value	  
+	  
       if (*p && !strncmp(pn,"bpm",3) && atoi(p) >= MIN_BPM && atoi(p) <= MAX_BPM)
       {
         con->m_vote_bpm=atoi(p);
         con->m_vote_bpm_lasttime=time(NULL);
       }
+// bpm false check for Bpi and Value
       else if (*p && !strncmp(pn,"bpi",3) && atoi(p) >= MIN_BPI && atoi(p) <= MAX_BPI)
       {
         con->m_vote_bpi=atoi(p);
         con->m_vote_bpi_lasttime=time(NULL);
       }
+// bpi fails check for Kick and Value (todo user@0.0.0.x)
+//     else if (*p && !strncmp(pn,"kick",3))
+//	(
+//        con->m_vote_kick=atoi(p);
+//        con->m_vote_kick_lasttime=time(NULL);
+//	)
+// Vote fails automate msg response	 
       else
       {
         mpb_chat_message newmsg;
         newmsg.parms[0]="MSG";
         newmsg.parms[1]="";
-        newmsg.parms[2]="[voting system] !vote requires <bpm|bpi> <value> parameters";
+        newmsg.parms[2]="[Incorrect Vote, example !vote bpm 120, !vote bpi 16] !vote requires <bpm|bpi> <value> parameters";
         con->Send(newmsg.build());
         return;
       }
@@ -1024,6 +1034,7 @@ void User_Group::onChatMessage(User_Connection *con, mpb_chat_message *msg)
       {
         int bpis[1+MAX_BPI-MIN_BPI]={0,};
         int bpms[1+MAX_BPM-MIN_BPM]={0,};
+//        int kicks[1+MAX_KICK-MIN_KICK]={0,};
         int x;
         int maxbpi=0, maxbpm=0;
         int vucnt=0;
@@ -1044,7 +1055,85 @@ void User_Group::onChatMessage(User_Connection *con, mpb_chat_message *msg)
               int v=++bpms[p->m_vote_bpm-MIN_BPM];
               if (v > bpms[maxbpm]) maxbpm=p->m_vote_bpm-MIN_BPM;
           }
+//          if (p->m_vote_kick_lasttime >= now-m_voting_timeout && p->m_vote_kick >= MIN_KICK && p->m_vote_kick <= MAX_KICK)
+//          {
+//              int v=++kicks[p->m_vote_kick-MIN_KICK];
+//              if (v > kicks[maxkick]) maxkick=p->m_vote_kick-MIN_KICK;
+//          }
         }
+// Kick Vote to be adapted
+//        if (kicks[maxkick] > 0 && !strncmp(pn,"kick",3))
+//        {
+//          if (kicks[maxkick] >= (vucnt * m_voting_threshold + 50)/100)
+//          {
+//            m_last_kick=maxkick+MIN_KICK;
+//            char buf[512];
+//            sprintf(buf,"[voting system] Kicking %d",m_last_kick);
+//
+//            mpb_chat_message newmsg;
+//            newmsg.parms[0]="MSG";
+//            newmsg.parms[1]="";
+//            newmsg.parms[2]=buf;
+//            need_bcast.Add(newmsg.build());
+//
+		  // try to kick user
+//            int x;
+//            int killcnt=0;
+//            int pl=strlen(p);
+//            for (x = 0; x < m_users.GetSize(); x ++)
+//            {
+//              User_Connection *c=m_users.Get(x);
+//              if ((p[pl-1] == '*' && !strncasecmp(c->m_username.Get(),p,pl-1)) || !strcasecmp(c->m_username.Get(),p))
+//              {
+//                if (c != con)
+//                {
+//                  WDL_String buf("User ");
+//                  buf.Append(c->m_username.Get());
+//                  buf.Append(" kicked by ");
+//                  buf.Append(con->m_username.Get());
+//
+//                  mpb_chat_message newmsg;
+//                  newmsg.parms[0]="MSG";
+//                  newmsg.parms[1]="";
+//                  newmsg.parms[2]=buf.Get();
+//                  Broadcast(newmsg.build());
+//
+//                  c->m_netcon.Kill();
+//                }
+//                killcnt++;
+//              }
+//            }
+//            if (!killcnt)
+//            {
+//              WDL_String tmp;
+//              tmp.Set("User \"");
+//              tmp.Append(p);
+//              tmp.Append("\" not found!\n");
+//
+//              mpb_chat_message newmsg;
+//              newmsg.parms[0]="MSG";
+//              newmsg.parms[1]="";
+//              newmsg.parms[2]=tmp.Get();
+//              con->Send(newmsg.build());
+//            }
+//
+//
+//
+//            for (x = 0; x < m_users.GetSize(); x ++)
+//              m_users.Get(x)->m_vote_bpm_lasttime = 0;
+//          }
+//          else
+//          {
+//            char buf[512];
+//            sprintf(buf,"[voting system] leading candidate: %d/%d votes for %d BPM [each vote expires in %ds]",kicks[maxkick],(vucnt * m_voting_threshold + 50)/100,maxkick+MIN_KICK,m_voting_timeout);
+//
+//            mpb_chat_message newmsg;
+//            newmsg.parms[0]="MSG";
+//            newmsg.parms[1]="";
+//            newmsg.parms[2]=buf;
+//            need_bcast.Add(newmsg.build());
+//          }
+//        }
         if (bpms[maxbpm] > 0 && !strncmp(pn,"bpm",3))
         {
           if (bpms[maxbpm] >= (vucnt * m_voting_threshold + 50)/100)
@@ -1236,7 +1325,8 @@ void User_Group::onChatMessage(User_Connection *con, mpb_chat_message *msg)
           while (*p == ' ') p++;
           if (*p)
           {
-            // try to kick user
+//			Need to hit this bit of code for kick as adminerr
+		  // try to kick user
             int x;
             int killcnt=0;
             int pl=strlen(p);
@@ -1288,7 +1378,7 @@ void User_Group::onChatMessage(User_Connection *con, mpb_chat_message *msg)
           mpb_chat_message newmsg;
           newmsg.parms[0]="MSG";
           newmsg.parms[1]="";
-          newmsg.parms[2]="No BPM/BPI permission";
+          newmsg.parms[2]="No BPM/BPI/KICK permission";
           con->Send(newmsg.build());
         }
         else
